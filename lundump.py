@@ -190,9 +190,10 @@ class Chunk:
         for i in range(len(self.instructions)):
             print("[%3d] %s" % (i, self.instructions[i].toString()))
 
-        print("\n==== [[" + str(self.name) + "'s protos]] ====\n")
-        for z in self.protos:
-            z.print()
+        if len(self.protos) > 0:
+            print("\n==== [[" + str(self.name) + "'s protos]] ====\n")
+            for z in self.protos:
+                z.print()
 
 instr_lookup_tbl = [
     Instruction(InstructionType.ABC, "MOVE"),  Instruction(InstructionType.ABx, "LOADK"), Instruction(InstructionType.ABC, "LOADBOOL"),
