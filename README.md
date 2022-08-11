@@ -1,11 +1,18 @@
 # LuaDecompy
 
-An experimental Lua 5.1 bytecode decompiler.
+An experimental Lua 5.1 dump decompiler (typically dumped using `luac -o <out.luac> <script.lua>`).
 
 ## Example usage
 
 ```sh
-❯ python main.py example.luac
+> cat example.lua && luac5.1 -o example.luac example.lua
+pp = "pri" .. "nt"
+
+if 2 + 2 == 4 then
+    _G[pp]("Hello world")
+end
+
+> python main.py example.luac
 example.luac
 
 ==== [[example.lua's constants]] ====
@@ -24,29 +31,19 @@ example.luac
 [  2]     CONCAT : R[0] R[0] R[1]
 [  3]  SETGLOBAL : R[0] R[0]
 [  4]         EQ : R[0] K[3] K[3]
-[  5]        JMP : R[0] R[12]
+[  5]        JMP : R[0] R[5]
 [  6]  GETGLOBAL : R[0] K[4]
 [  7]  GETGLOBAL : R[1] K[0]
 [  8]   GETTABLE : R[0] R[0] R[1]
 [  9]      LOADK : R[1] K[5]
-[ 10]       CALL : R[0] R[2] R[4]
-[ 11]  GETGLOBAL : R[3] K[4]
-[ 12]  GETGLOBAL : R[4] K[0]
-[ 13]   GETTABLE : R[3] R[3] R[4]
-[ 14]       MOVE : R[4] R[2] R[0]
-[ 15]       MOVE : R[5] R[1] R[0]
-[ 16]       MOVE : R[6] R[0] R[0]
-[ 17]       CALL : R[3] R[4] R[1]
-[ 18]     RETURN : R[0] R[1] R[0]
+[ 10]       CALL : R[0] R[2] R[1]
+[ 11]     RETURN : R[0] R[1] R[0]
 
 ==== [[example.lua's decompiled source]] ====
 
 
 pp = "pri" .. "nt"
 if 4.0 == 4.0 then 
-    local __unknLocal0, __unknLocal1, __unknLocal2 = _G[pp]("Hello world")
-    _G[pp](__unknLocal2, __unknLocal1, __unknLocal0)
+    _G[pp]("Hello world")
 end
-
-
 ```
