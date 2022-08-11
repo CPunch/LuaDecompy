@@ -2,6 +2,12 @@
 
 An experimental Lua 5.1 dump decompiler (typically dumped using `luac -o <out.luac> <script.lua>`).
 
+You will quickly find that only **extremely** simple scripts are decompiled successfully right now. This is an experimental project and not all opcodes are properly handled for now. If you need a real decompiler I would recommend any of the handful of ones that exist already.
+
+## Why?
+
+Lua has a relatively small instruction set (only 38 different opcodes!). This makes it pretty feasible for a weekend decompiler project. (real) Decompilers are extremely complex pieces of software, so being able to write a simpler one helps show the theory without *much* of the headache.
+
 ## Example usage
 
 ```sh
