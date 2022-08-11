@@ -53,11 +53,17 @@ class LuaDecomp:
         self.__startStatement()
         self.__addExpr("local " + self.locals[indx] + " = " + expr)
 
+    def __getInstrAtPC(self, pc: int) -> Instruction:
+        if pc < len(self.chunk.instructions):
+            return self.chunk.instructions[pc]
+
+        raise Exception("Decompilation failed!")
+
     def __getNextInstr(self) -> Instruction:
         if self.pc + 1 < len(self.chunk.instructions):
             return self.chunk.instructions[self.pc + 1]
 
-        return None
+        raise Exception("Decompilation failed!")
 
     def __getCurrInstr(self) -> Instruction:
         return self.chunk.instructions[self.pc]
@@ -101,6 +107,30 @@ class LuaDecomp:
 
     def __emitOperand(self, a: int, b: str, c: str, op: str) -> None:
         self.__setReg(a, "(" + b + op + c + ")")
+
+    def __compJmp(self, op: str):
+        instr = self.__getCurrInstr()
+        jmpType = "if"
+        scopeStart = "then"
+
+        # we need to check if the jmp location has a jump back (if so, it's a while loop)
+        jmp = self.__getNextInstr().B + 1
+        jmpToInstr = self.__getInstrAtPC(self.pc + jmp)
+
+        if jmpToInstr.opcode == Opcodes.JMP:
+            # if this jump jumps back to this compJmp, it's a loop!
+            if self.pc + jmp + jmpToInstr.B <= self.pc + 1:
+                jmpType = "while"
+                scopeStart = "do"
+
+        self.__startStatement()
+        if instr.A > 0:
+            self.__addExpr("%s not " % jmpType)
+        else:
+            self.__addExpr("%s " % jmpType)
+        self.__addExpr(self.__readRK(instr.B) + op + self.__readRK(instr.C) + " ")
+        self.__startScope("%s " % scopeStart, jmp)
+        self.pc += 1 # skip next instr
 
     # 'RK's are special in because can be a register or a konstant. a bitflag is read to determine which
     def __readRK(self, rk: int) -> str:
@@ -163,19 +193,11 @@ class LuaDecomp:
         elif instr.opcode == Opcodes.JMP:
             pass
         elif instr.opcode == Opcodes.EQ:
-            self.__startStatement()
-            if instr.A > 0:
-                self.__addExpr("if not ")
-            else:
-                self.__addExpr("if ")
-            self.__addExpr(self.__readRK(instr.B) + " == " + self.__readRK(instr.C) + " ")
-            self.__startScope("then ", self.__getNextInstr().B + 1)
-
-            self.pc += 1 # skip next instr
+            self.__compJmp(" == ")
         elif instr.opcode == Opcodes.LT:
-            self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " < ")
+            self.__compJmp(" < ")
         elif instr.opcode == Opcodes.LE:
-            self.__emitOperand(instr.A, instr.B, instr.C, " <= ")
+            self.__compJmp(" <= ")
         elif instr.opcode == Opcodes.CALL:
             preStr = ""
             callStr = ""

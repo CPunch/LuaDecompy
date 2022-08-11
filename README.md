@@ -12,44 +12,46 @@ Lua has a relatively small instruction set (only 38 different opcodes!). This ma
 
 ```sh
 > cat example.lua && luac5.1 -o example.luac example.lua
-pp = "pri" .. "nt"
+i = 0
 
-if 2 + 2 == 4 then
-    _G[pp]("Hello world")
+while i < 10 do
+    print(i)
+    i = i + 1
 end
-
 > python main.py example.luac
 example.luac
 
 ==== [[example.lua's constants]] ====
 
-0: [STRING] pp
-1: [STRING] pri
-2: [STRING] nt
-3: [NUMBER] 4.0
-4: [STRING] _G
-5: [STRING] Hello world
+0: [STRING] i
+1: [NUMBER] 0.0
+2: [NUMBER] 10.0
+3: [STRING] print
+4: [NUMBER] 1.0
 
 ==== [[example.lua's dissassembly]] ====
 
-[  0]      LOADK :   R[0]   K[1]               ; load "pri" into R[0]
-[  1]      LOADK :   R[1]   K[2]               ; load "nt" into R[1]
-[  2]     CONCAT :   R[0]   R[0]   R[1]        ; concat 2 values from R[0] to R[1], store into R[0]
-[  3]  SETGLOBAL :   R[0]   K[0]               ; 
-[  4]         EQ :   R[0]   K[3]   K[3]        ; 
-[  5]        JMP :   R[0]   R[5]               ; 
-[  6]  GETGLOBAL :   R[0]   K[4]               ; 
-[  7]  GETGLOBAL :   R[1]   K[0]               ; 
-[  8]   GETTABLE :   R[0]   R[0]   R[1]        ; 
-[  9]      LOADK :   R[1]   K[5]               ; load "Hello world" into R[1]
-[ 10]       CALL :   R[0]   R[2]   R[1]        ; 
-[ 11]     RETURN :   R[0]   R[1]   R[0]        ; 
+[  0]      LOADK :   R[0]   K[1]               ; load 0.0 into R[0]
+[  1]  SETGLOBAL :   R[0]   K[0]               ; 
+[  2]  GETGLOBAL :   R[0]   K[0]               ; 
+[  3]         LT :   R[0]   R[0]   K[2]        ; 
+[  4]        JMP :   R[0]      7               ; 
+[  5]  GETGLOBAL :   R[0]   K[3]               ; 
+[  6]  GETGLOBAL :   R[1]   K[0]               ; 
+[  7]       CALL :   R[0]      2      1        ; 
+[  8]  GETGLOBAL :   R[0]   K[0]               ; 
+[  9]        ADD :   R[0]   R[0]   K[4]        ; 
+[ 10]  SETGLOBAL :   R[0]   K[0]               ; 
+[ 11]        JMP :   R[0]    -10               ; 
+[ 12]     RETURN :   R[0]      1      0        ; 
 
 ==== [[example.lua's decompiled source]] ====
 
 
-pp = "pri" .. "nt"
-if 4.0 == 4.0 then 
-    _G[pp]("Hello world")
+i = 0.0
+while i < 10.0 do 
+    print(i)
+    i = (i + 1.0)
 end
+
 ```

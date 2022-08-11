@@ -101,8 +101,8 @@ class Instruction:
         if self.type == InstructionType.ABC:
             # by default, treat them as registers
             A = "R[%d]" % self.A
-            B = "R[%d]" % self.B
-            C = "R[%d]" % self.C
+            B = "%d" % self.B
+            C = "%d" % self.C
 
             # these opcodes have RKs for B & C
             if self.opcode in _RKBCInstr:
@@ -114,7 +114,7 @@ class Instruction:
             regs = "%6s %6s %6s" % (A, B, C) 
         elif self.type == InstructionType.ABx or self.type == InstructionType.AsBx:
             A = "R[%d]" % self.A
-            B = "R[%d]" % self.B
+            B = "%d" % self.B
 
             if self.opcode in _KBx:
                 B = "K[%d]" % self.B
