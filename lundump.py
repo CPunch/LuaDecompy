@@ -68,7 +68,7 @@ class ConstType(IntEnum):
 
 _RKBCInstr = [Opcodes.SETTABLE, Opcodes.ADD, Opcodes.SUB, Opcodes.MUL, Opcodes.DIV, Opcodes.MOD, Opcodes.POW, Opcodes.EQ, Opcodes.LT]
 _RKCInstr = [Opcodes.GETTABLE, Opcodes.SELF]
-_KBx = [Opcodes.LOADK, Opcodes.GETGLOBAL]
+_KBx = [Opcodes.LOADK, Opcodes.GETGLOBAL, Opcodes.SETGLOBAL]
 
 # is an 'RK' value a K? (result is true for K, false for R)
 def whichRK(rk: int):
@@ -130,7 +130,7 @@ class Instruction:
             return "load %s into R[%d]" % (chunk.getConstant(self.B).toCode(), self.A)
         elif self.opcode == Opcodes.CONCAT:
             count = self.C - self.B + 1
-            return "concat %d values from R[%d] to R[%d]" % (count, self.B, self.C)
+            return "concat %d values from R[%d] to R[%d], store into R[%d]" % (count, self.B, self.C, self.A)
         else:
             return ""
 
