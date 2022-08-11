@@ -70,6 +70,14 @@ _RKBCInstr = [Opcodes.SETTABLE, Opcodes.ADD, Opcodes.SUB, Opcodes.MUL, Opcodes.D
 _RKCInstr = [Opcodes.GETTABLE, Opcodes.SELF]
 _KBx = [Opcodes.LOADK, Opcodes.GETGLOBAL]
 
+# is an 'RK' value a K? (result is true for K, false for R)
+def whichRK(rk: int):
+    return (rk & (1 << 8)) > 0
+
+# read an RK as a K
+def readRKasK(rk: int):
+    return (rk & ~(1 << 8))
+
 class Instruction:
     def __init__(self, type: InstructionType, name: str) -> None:
         self.type = type
@@ -80,10 +88,9 @@ class Instruction:
         self.C: int = None
 
     # 'RK's are special in because can be a register or a konstant. a bitflag is read to determine which
-    @staticmethod
-    def __readRK(rk: int) -> str:
-        if (rk & (1 << 8)) > 0:
-            return "K[" + str((rk & ~(1 << 8))) + "]"
+    def __formatRK(self, rk: int) -> str:
+        if whichRK(rk):
+            return "K[" + str(readRKasK(rk)) + "]"
         else:
             return "R[" + str(rk) + "]"
 
@@ -99,12 +106,12 @@ class Instruction:
 
             # these opcodes have RKs for B & C
             if self.opcode in _RKBCInstr:
-                B = self.__readRK(self.B)
-                C = self.__readRK(self.C)
+                B = self.__formatRK(self.B)
+                C = self.__formatRK(self.C)
             elif self.opcode in _RKCInstr: # just for C
-                C = self.__readRK(self.C)
+                C = self.__formatRK(self.C)
 
-            regs = "%s %s %s" % (A, B, C) 
+            regs = "%6s %6s %6s" % (A, B, C) 
         elif self.type == InstructionType.ABx or self.type == InstructionType.AsBx:
             A = "R[%d]" % self.A
             B = "R[%d]" % self.B
@@ -112,9 +119,20 @@ class Instruction:
             if self.opcode in _KBx:
                 B = "K[%d]" % self.B
 
-            regs = "%s %s" % (A, B)
+            regs = "%6s %6s" % (A, B)
 
         return "%s : %s" % (instr, regs)
+
+    def getAnnotation(self, chunk):
+        if self.opcode == Opcodes.MOVE:
+            return "move R[%d] into R[%d]" % (self.B, self.A)
+        elif self.opcode == Opcodes.LOADK:
+            return "load %s into R[%d]" % (chunk.getConstant(self.B).toCode(), self.A)
+        elif self.opcode == Opcodes.CONCAT:
+            count = self.C - self.B + 1
+            return "concat %d values from R[%d] to R[%d]" % (count, self.B, self.C)
+        else:
+            return ""
 
 class Constant:
     def __init__(self, type: ConstType, data) -> None:
@@ -181,6 +199,9 @@ class Chunk:
         # there's no local information (may have been stripped)
         return None
 
+    def getConstant(self, indx: int) -> Constant:
+        return self.constants[indx]
+
     def print(self):
         print("\n==== [[" + str(self.name) + "'s constants]] ====\n")
         for z in range(len(self.constants)):
@@ -189,7 +210,7 @@ class Chunk:
 
         print("\n==== [[" + str(self.name) + "'s dissassembly]] ====\n")
         for i in range(len(self.instructions)):
-            print("[%3d] %s" % (i, self.instructions[i].toString()))
+            print("[%3d] %-40s ; %s" % (i, self.instructions[i].toString(), self.instructions[i].getAnnotation(self)))
 
         if len(self.protos) > 0:
             print("\n==== [[" + str(self.name) + "'s protos]] ====\n")
