@@ -80,7 +80,8 @@ class Instruction:
         self.C: int = None
 
     # 'RK's are special in because can be a register or a konstant. a bitflag is read to determine which
-    def __readRK(self, rk: int) -> str:
+    @staticmethod
+    def __readRK(rk: int) -> str:
         if (rk & (1 << 8)) > 0:
             return "K[" + str((rk & ~(1 << 8))) + "]"
         else:
