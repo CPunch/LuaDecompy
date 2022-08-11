@@ -1,14 +1,14 @@
 '''
     lparser.py
 
-    Depends on ldump.py for lua dump deserialization.
+    Depends on lundump.py for lua dump deserialization.
 
     An experimental bytecode decompiler.
 '''
 
 from operator import concat
 from subprocess import call
-from lundump import Chunk, LuaUndump, Constant, Instruction, InstructionType, Opcodes
+from lundump import Chunk, Constant, Instruction, Opcodes, whichRK, readRKasK
 
 class _Scope:
     def __init__(self, startPC: int, endPC: int):
@@ -104,8 +104,8 @@ class LuaDecomp:
 
     # 'RK's are special in because can be a register or a konstant. a bitflag is read to determine which
     def __readRK(self, rk: int) -> str:
-        if (rk & (1 << 8)) > 0:
-            return self.chunk.constants[(rk & ~(1 << 8))].toCode()
+        if (whichRK(rk)) > 0:
+            return self.chunk.getConstant(readRKasK(rk)).toCode()
         else:
             return self.__getReg(rk)
 
@@ -117,19 +117,19 @@ class LuaDecomp:
             # move registers
             self.__setReg(instr.A, self.__getReg(instr.B))
         elif instr.opcode == Opcodes.LOADK:
-            self.__setReg(instr.A, self.chunk.constants[instr.B].toCode())
+            self.__setReg(instr.A, self.chunk.getConstant(instr.B).toCode())
         elif instr.opcode == Opcodes.LOADBOOL:
             if instr.B == 0:
                 self.__setReg(instr.A, "false")
             else:
                 self.__setReg(instr.A, "true")
         elif instr.opcode == Opcodes.GETGLOBAL:
-            self.__setReg(instr.A, self.chunk.constants[instr.B].data)
+            self.__setReg(instr.A, self.chunk.getConstant(instr.B).data)
         elif instr.opcode == Opcodes.GETTABLE:
             self.__setReg(instr.A, self.__getReg(instr.B) + "[" + self.__readRK(instr.C) + "]")
         elif instr.opcode == Opcodes.SETGLOBAL:
             self.__startStatement()
-            self.__addExpr(self.chunk.constants[instr.B].data + " = " + self.__getReg(instr.A))
+            self.__addExpr(self.chunk.getConstant(instr.B).data + " = " + self.__getReg(instr.A))
         elif instr.opcode == Opcodes.SETTABLE:
             self.__startStatement()
             self.__addExpr(self.__getReg(instr.A) + "[" + self.__readRK(instr.B) + "] = " + self.__readRK(instr.C))
