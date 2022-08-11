@@ -66,6 +66,10 @@ class ConstType(IntEnum):
     NUMBER  = 3,
     STRING  = 4,
 
+_RKBCInstr = [Opcodes.SETTABLE, Opcodes.ADD, Opcodes.SUB, Opcodes.MUL, Opcodes.DIV, Opcodes.MOD, Opcodes.POW, Opcodes.EQ, Opcodes.LT]
+_RKCInstr = [Opcodes.GETTABLE, Opcodes.SELF]
+_KBx = [Opcodes.LOADK, Opcodes.GETGLOBAL]
+
 class Instruction:
     def __init__(self, type: InstructionType, name: str) -> None:
         self.type = type
@@ -87,20 +91,27 @@ class Instruction:
         regs = ""
 
         if self.type == InstructionType.ABC:
-            A = "%d" % self.A
-            B = "%d" % self.B
-            C = "%d" % self.C
+            # by default, treat them as registers
+            A = "R[%d]" % self.A
+            B = "R[%d]" % self.B
+            C = "R[%d]" % self.C
 
             # these opcodes have RKs for B & C
-            if self.opcode == Opcodes.SETTABLE or self.opcode == Opcodes.EQ or self.opcode == Opcodes.LT:
+            if self.opcode in _RKBCInstr:
                 B = self.__readRK(self.B)
                 C = self.__readRK(self.C)
-            elif self.opcode == Opcodes.GETTABLE: # just for C
+            elif self.opcode in _RKCInstr: # just for C
                 C = self.__readRK(self.C)
 
             regs = "%s %s %s" % (A, B, C) 
         elif self.type == InstructionType.ABx or self.type == InstructionType.AsBx:
-            regs = "%d %d" % (self.A, self.B)
+            A = "R[%d]" % self.A
+            B = "R[%d]" % self.B
+
+            if self.opcode in _KBx:
+                B = "K[%d]" % self.B
+
+            regs = "%s %s" % (A, B)
 
         return "%s : %s" % (instr, regs)
 
