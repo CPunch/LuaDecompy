@@ -12,10 +12,10 @@ Lua has a relatively small instruction set (only 38 different opcodes!). This ma
 
 ```sh
 > cat example.lua && luac5.1 -o example.luac example.lua
-i = 0
+local i, x = 0, 2
 
 while i < 10 do
-    print(i)
+    print(i + x)
     i = i + 1
 end
 > python main.py example.luac
@@ -23,34 +23,32 @@ example.luac
 
 ==== [[example.lua's constants]] ====
 
-0: [STRING] i
-1: [NUMBER] 0.0
+0: [NUMBER] 0.0
+1: [NUMBER] 2.0
 2: [NUMBER] 10.0
 3: [STRING] print
 4: [NUMBER] 1.0
 
 ==== [[example.lua's dissassembly]] ====
 
-[  0]      LOADK :   R[0]   K[1]               ; load 0.0 into R[0]
-[  1]  SETGLOBAL :   R[0]   K[0]               ; 
-[  2]  GETGLOBAL :   R[0]   K[0]               ; 
-[  3]         LT :   R[0]   R[0]   K[2]        ; 
-[  4]        JMP :   R[0]      7               ; 
-[  5]  GETGLOBAL :   R[0]   K[3]               ; 
-[  6]  GETGLOBAL :   R[1]   K[0]               ; 
-[  7]       CALL :   R[0]      2      1        ; 
-[  8]  GETGLOBAL :   R[0]   K[0]               ; 
-[  9]        ADD :   R[0]   R[0]   K[4]        ; 
-[ 10]  SETGLOBAL :   R[0]   K[0]               ; 
-[ 11]        JMP :   R[0]    -10               ; 
-[ 12]     RETURN :   R[0]      1      0        ; 
+[  0]      LOADK :   R[0]   K[0]               ; load 0.0 into R[0]
+[  1]      LOADK :   R[1]   K[1]               ; load 2.0 into R[1]
+[  2]         LT :   R[0]   R[0]   K[2]        ; 
+[  3]        JMP :   R[0]      5               ; 
+[  4]  GETGLOBAL :   R[2]   K[3]               ; 
+[  5]        ADD :   R[3]   R[0]   R[1]        ; 
+[  6]       CALL :   R[2]      2      1        ; 
+[  7]        ADD :   R[0]   R[0]   K[4]        ; 
+[  8]        JMP :   R[0]     -7               ; 
+[  9]     RETURN :   R[0]      1      0        ; 
 
 ==== [[example.lua's decompiled source]] ====
 
 
-i = 0.0
+local i = 0.0
+local x = 2.0
 while i < 10.0 do 
-    print(i)
+    print((i + x))
     i = (i + 1.0)
 end
 

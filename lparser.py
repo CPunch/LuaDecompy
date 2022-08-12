@@ -8,12 +8,19 @@
 
 from operator import concat
 from subprocess import call
+from xmlrpc.client import Boolean
 from lundump import Chunk, Constant, Instruction, Opcodes, whichRK, readRKasK
 
 class _Scope:
     def __init__(self, startPC: int, endPC: int):
         self.startPC = startPC
         self.endPC = endPC
+
+class _Traceback:
+    def __init__(self):
+        self.sets = []
+        self.uses = []
+        self.isConst = False
 
 class LuaDecomp:
     def __init__(self, chunk: Chunk):
@@ -22,12 +29,15 @@ class LuaDecomp:
         self.scope = []
         self.top = {}
         self.locals = {}
+        self.traceback = {}
         self.unknownLocalCount = 0
         self.src: str = ""
 
         # configurations!
-        self.aggressiveLocals = False # should *EVERY* accessed register be considered a local? 
+        self.aggressiveLocals = False # should *EVERY* set register be considered a local? 
         self.indexWidth = 4 # how many spaces for indentions?
+
+        self.__loadLocals()
 
         # parse instructions
         while self.pc < len(self.chunk.instructions):
@@ -54,6 +64,33 @@ class LuaDecomp:
     def __getCurrInstr(self) -> Instruction:
         return self.__getInstrAtPC(self.pc)
 
+    # when we read from a register, call this
+    def __addUseTraceback(self, reg: int) -> None:
+        if not self.pc in self.traceback:
+            self.traceback[self.pc] = _Traceback()
+
+        self.traceback[self.pc].uses.append(reg)
+
+    # when we write from a register, call this
+    def __addSetTraceback(self, reg: int) -> None:
+        if not self.pc in self.traceback:
+            self.traceback[self.pc] = _Traceback()
+
+        self.traceback[self.pc].sets.append(reg)
+
+    # walks traceback, if local wasn't set before, the local needs to be defined
+    def __needsDefined(self, reg) -> Boolean:
+        for _, trace in self.traceback.items():
+            if reg in trace.sets:
+                return False
+
+        # wasn't set in traceback! needs defined!
+        return True
+
+    def __loadLocals(self):
+        for i in range(len(self.chunk.locals)):
+            self.locals[i] = self.chunk.locals[i].name
+
     def __addExpr(self, code: str) -> None:
         self.src += code
 
@@ -61,22 +98,34 @@ class LuaDecomp:
         self.src += '\n' + (' ' * self.indexWidth * len(self.scope))
 
     def __getReg(self, indx: int) -> str:
+        self.__addUseTraceback(indx)
+
         # if the top indx is a local, get it
-        return self.locals[indx] if indx in self.locals else  self.top[indx]
+        return self.locals[indx] if indx in self.locals else self.top[indx]
 
     def __setReg(self, indx: int, code: str) -> None:
         # if the top indx is a local, set it
         if indx in self.locals:
-            self.__startStatement()
-            self.__addExpr(self.locals[indx] + " = " + code)
+            if self.__needsDefined(indx):
+                self.__newLocal(indx, code)
+            else:
+                self.__startStatement()
+                self.__addExpr(self.locals[indx] + " = " + code)
         elif self.aggressiveLocals: # 'every register is a local!!'
             self.__newLocal(indx, code)
 
+
+        self.__addSetTraceback(indx)
         self.top[indx] = code
 
     # ========================================[[ Locals ]]=========================================
 
     def __makeLocalIdentifier(self, indx: int) -> str:
+        # first, check if we have a local name already determined
+        if indx in self.locals:
+            return self.locals[indx]
+
+        # otherwise, generate a local
         self.locals[indx] = "__unknLocal%d" % self.unknownLocalCount
         self.unknownLocalCount += 1
 
