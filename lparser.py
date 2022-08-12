@@ -89,7 +89,10 @@ class LuaDecomp:
 
     def __loadLocals(self):
         for i in range(len(self.chunk.locals)):
-            self.locals[i] = self.chunk.locals[i].name
+            if not self.chunk.locals[i].name == "":
+                self.locals[i] = self.chunk.locals[i].name 
+            else:
+                self.__makeLocalIdentifier(i)
 
     def __addExpr(self, code: str) -> None:
         self.src += code
