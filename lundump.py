@@ -100,15 +100,17 @@ class Instruction:
 
         if self.type == InstructionType.ABC:
             # by default, treat them as registers
-            A = "R[%d]" % self.A
+            A = "%d" % self.A
             B = "%d" % self.B
             C = "%d" % self.C
 
             # these opcodes have RKs for B & C
             if self.opcode in _RKBCInstr:
+                A = "R[%d]" % self.A
                 B = self.__formatRK(self.B)
                 C = self.__formatRK(self.C)
             elif self.opcode in _RKCInstr: # just for C
+                A = "R[%d]" % self.A
                 C = self.__formatRK(self.C)
 
             regs = "%6s %6s %6s" % (A, B, C) 
@@ -128,6 +130,16 @@ class Instruction:
             return "move R[%d] into R[%d]" % (self.B, self.A)
         elif self.opcode == Opcodes.LOADK:
             return "load %s into R[%d]" % (chunk.getConstant(self.B).toCode(), self.A)
+        elif self.opcode == Opcodes.GETGLOBAL:
+            return 'move _G[%s] into R[%d]' % (chunk.getConstant(self.B).toCode(), self.A)
+        elif self.opcode == Opcodes.ADD:
+            return 'add %s to %s, place into R[%d]' % (self.__formatRK(self.C), self.__formatRK(self.B), self.A)
+        elif self.opcode == Opcodes.SUB:
+            return 'sub %s from %s, place into R[%d]' % (self.__formatRK(self.C), self.__formatRK(self.B), self.A)
+        elif self.opcode == Opcodes.MUL:
+            return 'mul %s to %s, place into R[%d]' % (self.__formatRK(self.C), self.__formatRK(self.B), self.A)
+        elif self.opcode == Opcodes.DIV:
+            return 'div %s from %s, place into R[%d]' % (self.__formatRK(self.C), self.__formatRK(self.B), self.A)
         elif self.opcode == Opcodes.CONCAT:
             count = self.C - self.B + 1
             return "concat %d values from R[%d] to R[%d], store into R[%d]" % (count, self.B, self.C, self.A)
