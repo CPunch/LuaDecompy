@@ -235,7 +235,7 @@ class LuaDecomp:
         elif instr.opcode == Opcodes.UNM:
             self.__setReg(instr.A, "-" + self.__getReg(instr.B))
         elif instr.opcode == Opcodes.NOT:
-            self.__setReg(instr.A, "!" + self.__getReg(instr.B))
+            self.__setReg(instr.A, "not " + self.__getReg(instr.B))
         elif instr.opcode == Opcodes.LEN:
             self.__setReg(instr.A, "#" + self.__getCurrInstr(instr.B))
         elif instr.opcode == Opcodes.CONCAT:
