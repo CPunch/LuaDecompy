@@ -31,7 +31,7 @@ class LuaDecomp:
 
         # parse instructions
         while self.pc < len(self.chunk.instructions):
-            self.parseExpr()
+            self.parseInstr()
             self.pc += 1
 
             # end the scope (if we're supposed too)
@@ -40,18 +40,7 @@ class LuaDecomp:
         print("\n==== [[" + str(self.chunk.name) + "'s decompiled source]] ====\n")
         print(self.src)
 
-    def __makeLocalIdentifier(self, indx: int) -> str:
-        self.locals[indx] = "__unknLocal%d" % self.unknownLocalCount
-        self.unknownLocalCount += 1
-
-        return self.locals[indx]
-
-    def __newLocal(self, indx: int, expr: str) -> None:
-        # TODO: grab identifier from chunk(?)
-        self.__makeLocalIdentifier(indx)
-
-        self.__startStatement()
-        self.__addExpr("local " + self.locals[indx] + " = " + expr)
+    # =======================================[[ Helpers ]]=========================================
 
     def __getInstrAtPC(self, pc: int) -> Instruction:
         if pc < len(self.chunk.instructions):
@@ -60,13 +49,10 @@ class LuaDecomp:
         raise Exception("Decompilation failed!")
 
     def __getNextInstr(self) -> Instruction:
-        if self.pc + 1 < len(self.chunk.instructions):
-            return self.chunk.instructions[self.pc + 1]
-
-        raise Exception("Decompilation failed!")
+        return self.__getInstrAtPC(self.pc + 1)
 
     def __getCurrInstr(self) -> Instruction:
-        return self.chunk.instructions[self.pc]
+        return self.__getInstrAtPC(self.pc)
 
     def __addExpr(self, code: str) -> None:
         self.src += code
@@ -88,6 +74,23 @@ class LuaDecomp:
 
         self.top[indx] = code
 
+    # ========================================[[ Locals ]]=========================================
+
+    def __makeLocalIdentifier(self, indx: int) -> str:
+        self.locals[indx] = "__unknLocal%d" % self.unknownLocalCount
+        self.unknownLocalCount += 1
+
+        return self.locals[indx]
+
+    def __newLocal(self, indx: int, expr: str) -> None:
+        # TODO: grab identifier from chunk(?)
+        self.__makeLocalIdentifier(indx)
+
+        self.__startStatement()
+        self.__addExpr("local " + self.locals[indx] + " = " + expr)
+
+    # ========================================[[ Scopes ]]=========================================
+
     def __startScope(self, scopeType: str, size: int) -> None:
         self.__addExpr(scopeType)
         self.scope.append(_Scope(self.pc, self.pc + size))
@@ -104,6 +107,8 @@ class LuaDecomp:
         self.scope.pop()
         self.__startStatement()
         self.__addExpr("end")
+
+    # =====================================[[ Instructions ]]======================================
 
     def __emitOperand(self, a: int, b: str, c: str, op: str) -> None:
         self.__setReg(a, "(" + b + op + c + ")")
@@ -139,7 +144,7 @@ class LuaDecomp:
         else:
             return self.__getReg(rk)
 
-    def parseExpr(self):
+    def parseInstr(self):
         instr = self.__getCurrInstr()
 
         # python, add switch statements *please*
