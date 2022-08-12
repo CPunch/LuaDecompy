@@ -22,11 +22,19 @@ class _Traceback:
         self.uses = []
         self.isConst = False
 
+class _Line:
+    def __init__(self, startPC: int, endPC: int, src: str, scope: int):
+        self.startPC = startPC
+        self.endPC = endPC
+        self.src = src
+        self.scope = scope
+
 class LuaDecomp:
     def __init__(self, chunk: Chunk):
         self.chunk = chunk
         self.pc = 0
-        self.scope = []
+        self.scope: list[_Scope] = []
+        self.lines: list[_Line] = []
         self.top = {}
         self.locals = {}
         self.traceback = {}
@@ -35,6 +43,7 @@ class LuaDecomp:
 
         # configurations!
         self.aggressiveLocals = False # should *EVERY* set register be considered a local? 
+        self.annotateLines = False
         self.indexWidth = 4 # how many spaces for indentions?
 
         self.__loadLocals()
@@ -48,7 +57,11 @@ class LuaDecomp:
             self.__checkScope()
 
         print("\n==== [[" + str(self.chunk.name) + "'s decompiled source]] ====\n")
-        print(self.src)
+
+        for line in self.lines:
+            if self.annotateLines:
+                print("-- PC: %d to PC: %d" % (line.startPC, line.endPC))
+            print(((' ' * self.indexWidth) * line.scope) + line.src)
 
     # =======================================[[ Helpers ]]=========================================
 
@@ -64,19 +77,41 @@ class LuaDecomp:
     def __getCurrInstr(self) -> Instruction:
         return self.__getInstrAtPC(self.pc)
 
-    # when we read from a register, call this
-    def __addUseTraceback(self, reg: int) -> None:
+    def __makeTracIfNotExist(self) -> None:
         if not self.pc in self.traceback:
             self.traceback[self.pc] = _Traceback()
 
+    # when we read from a register, call this
+    def __addUseTraceback(self, reg: int) -> None:
+        self.__makeTracIfNotExist()
         self.traceback[self.pc].uses.append(reg)
 
     # when we write from a register, call this
     def __addSetTraceback(self, reg: int) -> None:
-        if not self.pc in self.traceback:
-            self.traceback[self.pc] = _Traceback()
-
+        self.__makeTracIfNotExist()
         self.traceback[self.pc].sets.append(reg)
+
+    def __addExpr(self, code: str) -> None:
+        self.src += code
+
+    def __endStatement(self):
+        startPC = self.lines[len(self.lines) - 1].endPC + 1 if len(self.lines) > 0 else 0
+        endPC = self.pc
+
+        # make sure we don't write an empty line
+        if not self.src == "":
+            self.lines.append(_Line(startPC, endPC, self.src, len(self.scope)))
+        self.src = ""
+
+    def __insertStatement(self, pc: int) -> None:
+        # insert current statement into lines at pc location
+        for i in range(len(self.lines)):
+            if self.lines[i].startPC <= pc and self.lines[i].endPC >= pc:
+                self.lines.insert(i, _Line(pc, pc, self.src, self.lines[i-1].scope if i > 0 else 0))
+                self.src = ""
+                return i
+
+        self.src = ""
 
     # walks traceback, if local wasn't set before, the local needs to be defined
     def __needsDefined(self, reg) -> Boolean:
@@ -94,12 +129,6 @@ class LuaDecomp:
             else:
                 self.__makeLocalIdentifier(i)
 
-    def __addExpr(self, code: str) -> None:
-        self.src += code
-
-    def __startStatement(self):
-        self.src += '\n' + (' ' * self.indexWidth * len(self.scope))
-
     def __getReg(self, indx: int) -> str:
         self.__addUseTraceback(indx)
 
@@ -112,8 +141,8 @@ class LuaDecomp:
             if self.__needsDefined(indx):
                 self.__newLocal(indx, code)
             else:
-                self.__startStatement()
                 self.__addExpr(self.locals[indx] + " = " + code)
+                self.__endStatement()
         elif self.aggressiveLocals: # 'every register is a local!!'
             self.__newLocal(indx, code)
 
@@ -138,14 +167,15 @@ class LuaDecomp:
         # TODO: grab identifier from chunk(?)
         self.__makeLocalIdentifier(indx)
 
-        self.__startStatement()
         self.__addExpr("local " + self.locals[indx] + " = " + expr)
+        self.__endStatement()
 
     # ========================================[[ Scopes ]]=========================================
 
-    def __startScope(self, scopeType: str, size: int) -> None:
+    def __startScope(self, scopeType: str, start: int, size: int) -> None:
         self.__addExpr(scopeType)
-        self.scope.append(_Scope(self.pc, self.pc + size))
+        self.__endStatement()
+        self.scope.append(_Scope(start, start + size))
 
     # checks if we need to end a scope
     def __checkScope(self) -> None:
@@ -156,9 +186,9 @@ class LuaDecomp:
             self.__endScope()
 
     def __endScope(self) -> None:
-        self.scope.pop()
-        self.__startStatement()
+        self.__endStatement()
         self.__addExpr("end")
+        self.scope.pop()
 
     # =====================================[[ Instructions ]]======================================
 
@@ -179,15 +209,33 @@ class LuaDecomp:
             if self.pc + jmp + jmpToInstr.B <= self.pc + 1:
                 jmpType = "while"
                 scopeStart = "do"
+        elif jmp < 0:
+            # 'repeat until' loop (probably)
+            jmpType = "until"
+            scopeStart = None
 
-        self.__startStatement()
         if instr.A > 0:
             self.__addExpr("%s not " % jmpType)
         else:
             self.__addExpr("%s " % jmpType)
         self.__addExpr(self.__readRK(instr.B) + op + self.__readRK(instr.C) + " ")
-        self.__startScope("%s " % scopeStart, jmp)
         self.pc += 1 # skip next instr
+        if scopeStart:
+            self.__startScope("%s " % scopeStart, self.pc - 1, jmp)
+
+            # we end the statement *after* scopeStart
+            self.__endStatement()
+        else:
+            # end the statement prior to repeat
+            self.__endStatement()
+
+            # it's a repeat until loop, insert 'repeat' at the jumpTo location
+            self.__addExpr("repeat")
+            insertedLine = self.__insertStatement(self.pc + jmp)
+
+            # add scope to every line in-between
+            for i in range(insertedLine+1, len(self.lines)-1):
+                self.lines[i].scope += 1
 
     # 'RK's are special in because can be a register or a konstant. a bitflag is read to determine which
     def __readRK(self, rk: int) -> str:
@@ -215,11 +263,11 @@ class LuaDecomp:
         elif instr.opcode == Opcodes.GETTABLE:
             self.__setReg(instr.A, self.__getReg(instr.B) + "[" + self.__readRK(instr.C) + "]")
         elif instr.opcode == Opcodes.SETGLOBAL:
-            self.__startStatement()
             self.__addExpr(self.chunk.getConstant(instr.B).data + " = " + self.__getReg(instr.A))
+            self.__endStatement()
         elif instr.opcode == Opcodes.SETTABLE:
-            self.__startStatement()
             self.__addExpr(self.__getReg(instr.A) + "[" + self.__readRK(instr.B) + "] = " + self.__readRK(instr.C))
+            self.__endStatement()
         elif instr.opcode == Opcodes.ADD:
             self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " + ")
         elif instr.opcode == Opcodes.SUB:
@@ -283,10 +331,10 @@ class LuaDecomp:
                     preStr += ", " if not indx == instr.A + instr.C - 2 else ""
                 preStr += " = "
 
-            self.__startStatement()
             self.__addExpr(preStr + callStr)
+            self.__endStatement()
         elif instr.opcode == Opcodes.RETURN:
-            self.__startStatement()
+            self.__endStatement()
             pass # no-op for now
         else:
             raise Exception("unsupported instruction: %s" % instr.toString())

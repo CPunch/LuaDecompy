@@ -204,9 +204,12 @@ class Chunk:
 
     def print(self):
         print("\n==== [[" + str(self.name) + "'s constants]] ====\n")
-        for z in range(len(self.constants)):
-            i = self.constants[z]
-            print(str(z) + ": " + i.toString())
+        for i in range(len(self.constants)):
+            print("%d: %s" % (i, self.constants[i].toString()))
+
+        print("\n==== [[" + str(self.name) + "'s locals]] ====\n")
+        for i in range(len(self.locals)):
+            print("R[%d]: %s" % (i, self.locals[i].name))
 
         print("\n==== [[" + str(self.name) + "'s dissassembly]] ====\n")
         for i in range(len(self.instructions)):
