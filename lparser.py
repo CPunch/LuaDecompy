@@ -29,6 +29,13 @@ class _Line:
         self.src = src
         self.scope = scope
 
+def isValidLocal(ident: str) -> bool:
+    for c in ident:
+        if c not in "abcdefghijklmnopqrstuvwxyz1234567890_":
+            return False
+
+    return True
+
 class LuaDecomp:
     def __init__(self, chunk: Chunk):
         self.chunk = chunk
@@ -124,10 +131,15 @@ class LuaDecomp:
 
     def __loadLocals(self):
         for i in range(len(self.chunk.locals)):
-            if not self.chunk.locals[i].name == "":
-                self.locals[i] = self.chunk.locals[i].name 
-            else:
+            name = self.chunk.locals[i].name
+            if isValidLocal(name):
+                self.locals[i] = name
+            elif "(for " not in name: # if it's a for loop register, ignore
                 self.__makeLocalIdentifier(i)
+
+    # when you *know* the register *has* to be a local (for loops, etc.)
+    def __getLocal(self, indx: int) -> str:
+        return self.locals[indx] if indx in self.locals else self.__makeLocalIdentifier(indx)
 
     def __getReg(self, indx: int) -> str:
         self.__addUseTraceback(indx)
@@ -336,5 +348,10 @@ class LuaDecomp:
         elif instr.opcode == Opcodes.RETURN:
             self.__endStatement()
             pass # no-op for now
+        elif instr.opcode == Opcodes.FORLOOP:
+            pass # no-op for now
+        elif instr.opcode == Opcodes.FORPREP:
+            self.__addExpr("for %s = %s, %s, %s " % (self.__getLocal(instr.A+3), self.__getReg(instr.A), self.__getReg(instr.A + 1), self.__getReg(instr.A + 2)))
+            self.__startScope("do", self.pc, instr.B)
         else:
             raise Exception("unsupported instruction: %s" % instr.toString())

@@ -400,7 +400,7 @@ class LuaUndump:
         # locals
         num = self.get_int()
         for i in range(num):
-            name = self.get_string(None) # local name
+            name = self.get_string(None)[:-1] # local name ([:-1] to remove the NULL terminator)
             start = self.get_int() # local start PC
             end = self.get_int() # local end PC
             chunk.appendLocal(Local(name, start, end))
