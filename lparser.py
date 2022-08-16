@@ -29,7 +29,12 @@ class _Line:
         self.scope = scope
 
 def isValidLocal(ident: str) -> bool:
-    for c in ident:
+    # has to start with an alpha or _
+    if ident[0] not in "abcdefghijklmnopqrstuvwxyz_":
+        return False
+
+    # then it can be alphanum or _
+    for c in ident[1:]:
         if c not in "abcdefghijklmnopqrstuvwxyz1234567890_":
             return False
 
@@ -200,6 +205,9 @@ class LuaDecomp:
         self.__addExpr("end")
         self.scope.pop()
 
+        self.__endStatement()
+
+
     # =====================================[[ Instructions ]]======================================
 
     def __emitOperand(self, a: int, b: str, c: str, op: str) -> None:
@@ -254,6 +262,33 @@ class LuaDecomp:
         else:
             return self.__getReg(rk)
 
+    # walk & peak ahead NEWTABLE
+    def __parseNewTable(self, indx: int):
+        # TODO: parse SETTABLE too?
+        tblOps = [Opcodes.LOADK, Opcodes.SETLIST]
+
+        instr = self.__getNextInstr()
+        cachedRegs = self.top
+        tbl = "{"
+        while instr.opcode in tblOps:
+            if instr.opcode == Opcodes.LOADK: # operate on registers
+                cachedRegs[instr.A] = self.chunk.getConstant(instr.B).toCode()
+            elif instr.opcode == Opcodes.SETLIST:
+                numElems = instr.B
+
+                for i in range(numElems):
+                    tbl += "%s, " % cachedRegs[instr.A + i + 1]
+
+            self.pc += 1
+            instr = self.__getNextInstr()
+        tbl += "}"
+
+        # i use forceLocal here even though i don't know *for sure* that the register is a local.
+        # this does help later though if the table is reused (which is 99% of the time). the other 1%
+        # only affects syntax and may look a little weird but is fine and equivalent non-the-less
+        self.__setReg(indx, tbl, forceLocal=True)
+        self.__endStatement()
+
     def parseInstr(self):
         instr = self.__getCurrInstr()
 
@@ -279,12 +314,7 @@ class LuaDecomp:
             self.__addExpr(self.__getReg(instr.A) + "[" + self.__readRK(instr.B) + "] = " + self.__readRK(instr.C))
             self.__endStatement()
         elif instr.opcode == Opcodes.NEWTABLE:
-            # i use forceLocal here even though i don't know *for sure* that the register is a local.
-            # this does help later though if the table is populated (which is 99% of the time). the other 1%
-            # only affects syntax and may look a little weird but is fine and equivalent non-the-less
-
-            # TODO: make this better
-            self.__setReg(instr.A, "{}", forceLocal=True)
+            self.__parseNewTable(instr.A)
         elif instr.opcode == Opcodes.ADD:
             self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " + ")
         elif instr.opcode == Opcodes.SUB:
@@ -302,7 +332,7 @@ class LuaDecomp:
         elif instr.opcode == Opcodes.NOT:
             self.__setReg(instr.A, "not " + self.__getReg(instr.B))
         elif instr.opcode == Opcodes.LEN:
-            self.__setReg(instr.A, "#" + self.__getCurrInstr(instr.B))
+            self.__setReg(instr.A, "#" + self.__getReg(instr.B))
         elif instr.opcode == Opcodes.CONCAT:
             count = instr.C-instr.B+1
             concatStr = ""
