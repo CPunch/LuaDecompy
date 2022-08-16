@@ -207,7 +207,6 @@ class LuaDecomp:
 
         self.__endStatement()
 
-
     # =====================================[[ Instructions ]]======================================
 
     def __emitOperand(self, a: int, b: str, c: str, op: str) -> None:
@@ -268,7 +267,7 @@ class LuaDecomp:
         tblOps = [Opcodes.LOADK, Opcodes.SETLIST]
 
         instr = self.__getNextInstr()
-        cachedRegs = self.top
+        cachedRegs = {}
         tbl = "{"
         while instr.opcode in tblOps:
             if instr.opcode == Opcodes.LOADK: # operate on registers
@@ -278,6 +277,7 @@ class LuaDecomp:
 
                 for i in range(numElems):
                     tbl += "%s, " % cachedRegs[instr.A + i + 1]
+                    del cachedRegs[instr.A + i + 1]
 
             self.pc += 1
             instr = self.__getNextInstr()
@@ -288,6 +288,10 @@ class LuaDecomp:
         # only affects syntax and may look a little weird but is fine and equivalent non-the-less
         self.__setReg(indx, tbl, forceLocal=True)
         self.__endStatement()
+
+        # if we have leftovers... oops, set those
+        for i, v in cachedRegs.items():
+            self.__setReg(i, v)
 
     def parseInstr(self):
         instr = self.__getCurrInstr()

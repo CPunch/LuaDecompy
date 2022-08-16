@@ -71,8 +71,9 @@ R[5]: i
 ==== [[example.lua's pseudo-code]] ====
 
 local tbl = {"He", "llo", " ", "Wo", "rld", "!", }
+local str = ""
 for i = 1, #tbl, 1 do
-    local str = str .. tbl[i]
+    str = str .. tbl[i]
 end
 print(str)
 
