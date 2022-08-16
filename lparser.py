@@ -8,7 +8,6 @@
 
 from operator import concat
 from subprocess import call
-from xmlrpc.client import Boolean
 from lundump import Chunk, Constant, Instruction, Opcodes, whichRK, readRKasK
 
 class _Scope:
@@ -63,7 +62,7 @@ class LuaDecomp:
             # end the scope (if we're supposed too)
             self.__checkScope()
 
-        print("\n==== [[" + str(self.chunk.name) + "'s decompiled source]] ====\n")
+        print("\n==== [[" + str(self.chunk.name) + "'s pseudo-code]] ====\n")
 
         for line in self.lines:
             if self.annotateLines:
@@ -121,7 +120,7 @@ class LuaDecomp:
         self.src = ""
 
     # walks traceback, if local wasn't set before, the local needs to be defined
-    def __needsDefined(self, reg) -> Boolean:
+    def __needsDefined(self, reg) -> bool:
         for _, trace in self.traceback.items():
             if reg in trace.sets:
                 return False
@@ -147,7 +146,7 @@ class LuaDecomp:
         # if the top indx is a local, get it
         return self.locals[indx] if indx in self.locals else self.top[indx]
 
-    def __setReg(self, indx: int, code: str) -> None:
+    def __setReg(self, indx: int, code: str, forceLocal: bool = False) -> None:
         # if the top indx is a local, set it
         if indx in self.locals:
             if self.__needsDefined(indx):
@@ -155,9 +154,8 @@ class LuaDecomp:
             else:
                 self.__addExpr(self.locals[indx] + " = " + code)
                 self.__endStatement()
-        elif self.aggressiveLocals: # 'every register is a local!!'
+        elif self.aggressiveLocals or forceLocal: # 'every register is a local!!'
             self.__newLocal(indx, code)
-
 
         self.__addSetTraceback(indx)
         self.top[indx] = code
@@ -280,6 +278,13 @@ class LuaDecomp:
         elif instr.opcode == Opcodes.SETTABLE:
             self.__addExpr(self.__getReg(instr.A) + "[" + self.__readRK(instr.B) + "] = " + self.__readRK(instr.C))
             self.__endStatement()
+        elif instr.opcode == Opcodes.NEWTABLE:
+            # i use forceLocal here even though i don't know *for sure* that the register is a local.
+            # this does help later though if the table is populated (which is 99% of the time). the other 1%
+            # only affects syntax and may look a little weird but is fine and equivalent non-the-less
+
+            # TODO: make this better
+            self.__setReg(instr.A, "{}", forceLocal=True)
         elif instr.opcode == Opcodes.ADD:
             self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " + ")
         elif instr.opcode == Opcodes.SUB:
@@ -353,5 +358,21 @@ class LuaDecomp:
         elif instr.opcode == Opcodes.FORPREP:
             self.__addExpr("for %s = %s, %s, %s " % (self.__getLocal(instr.A+3), self.__getReg(instr.A), self.__getReg(instr.A + 1), self.__getReg(instr.A + 2)))
             self.__startScope("do", self.pc, instr.B)
+        elif instr.opcode == Opcodes.SETLIST:
+            # LFIELDS_PER_FLUSH (50) is the number of elements that *should* have been set in the list in the *last* SETLIST
+            # eg.
+            # [ 49]      LOADK :  R[49]   K[1]               ; load 0.0 into R[49]
+            # [ 50]      LOADK :  R[50]   K[1]               ; load 0.0 into R[50]
+            # [ 51]    SETLIST :      0     50      1        ; sets list[1..50]
+            # [ 52]      LOADK :   R[1]   K[1]               ; load 0.0 into R[1]
+            # [ 53]    SETLIST :      0      1      2        ; sets list[51..51]
+            numElems = instr.B
+            startAt = ((instr.C - 1) * 50)
+            ident = self.__getLocal(instr.A)
+
+            # set each index (TODO: make tables less verbose)
+            for i in range(numElems):
+                self.__addExpr("%s[%d] = %s" % (ident, (startAt + i + 1), self.__getReg(instr.A + i + 1)))
+                self.__endStatement()
         else:
             raise Exception("unsupported instruction: %s" % instr.toString())

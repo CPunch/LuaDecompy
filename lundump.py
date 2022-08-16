@@ -152,7 +152,7 @@ class Constant:
         self.data = data
 
     def toString(self):
-        return "[" + self.type.name + "] " + str(self.data)
+        return "[%s] %s" % (self.type.name, str(self.data))
 
     # format the constant so that it is parsable by lua
     def toCode(self):
@@ -164,7 +164,7 @@ class Constant:
             else:
                 return "false"
         elif self.type == ConstType.NUMBER:
-            return str(self.data)
+            return "%g" % self.data
         else:
             return "nil"
 
