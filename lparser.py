@@ -30,12 +30,12 @@ class _Line:
 
 def isValidLocal(ident: str) -> bool:
     # has to start with an alpha or _
-    if ident[0] not in "abcdefghijklmnopqrstuvwxyz_":
+    if ident[0] not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_":
         return False
 
     # then it can be alphanum or _
     for c in ident[1:]:
-        if c not in "abcdefghijklmnopqrstuvwxyz1234567890_":
+        if c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_":
             return False
 
     return True
