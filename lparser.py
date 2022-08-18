@@ -6,8 +6,6 @@
     An experimental bytecode decompiler.
 '''
 
-from operator import concat
-from subprocess import call
 from lundump import Chunk, Constant, Instruction, Opcodes, whichRK, readRKasK
 
 class _Scope:
@@ -41,7 +39,7 @@ def isValidLocal(ident: str) -> bool:
     return True
 
 class LuaDecomp:
-    def __init__(self, chunk: Chunk):
+    def __init__(self, chunk: Chunk, headChunk: bool = True, scopeOffset: int = 0):
         self.chunk = chunk
         self.pc = 0
         self.scope: list[_Scope] = []
@@ -50,6 +48,8 @@ class LuaDecomp:
         self.locals = {}
         self.traceback = {}
         self.unknownLocalCount = 0
+        self.headChunk = headChunk
+        self.scopeOffset = scopeOffset # number of scopes this chunk/proto is in
         self.src: str = ""
 
         # configurations!
@@ -59,6 +59,20 @@ class LuaDecomp:
 
         self.__loadLocals()
 
+        if not self.headChunk:
+            functionProto = "function("
+
+            # define params
+            for i in range(self.chunk.numParams):
+                # add param to function prototype (also make a local in the register if it doesn't exist)
+                functionProto += ("%s, " if i+1 < self.chunk.numParams else "%s") % self.__makeLocalIdentifier(i)
+
+                # mark local as defined
+                self.__addSetTraceback(i)
+            functionProto += ")"
+
+            self.__startScope(functionProto, 0, len(self.chunk.instructions))
+
         # parse instructions
         while self.pc < len(self.chunk.instructions):
             self.parseInstr()
@@ -67,12 +81,18 @@ class LuaDecomp:
             # end the scope (if we're supposed too)
             self.__checkScope()
 
-        print("\n==== [[" + str(self.chunk.name) + "'s pseudo-code]] ====\n")
+        if not self.headChunk:
+            self.__endScope()
+
+    def getPseudoCode(self) -> str:
+        fullSrc = ""
 
         for line in self.lines:
             if self.annotateLines:
-                print("-- PC: %d to PC: %d" % (line.startPC, line.endPC))
-            print(((' ' * self.indexWidth) * line.scope) + line.src)
+                fullSrc += "-- PC: %d to PC: %d\n" % (line.startPC, line.endPC)
+            fullSrc += ((' ' * self.indexWidth) * (line.scope + self.scopeOffset)) + line.src + "\n"
+
+        return fullSrc
 
     # =======================================[[ Helpers ]]=========================================
 
@@ -179,7 +199,6 @@ class LuaDecomp:
         return self.locals[indx]
 
     def __newLocal(self, indx: int, expr: str) -> None:
-        # TODO: grab identifier from chunk(?)
         self.__makeLocalIdentifier(indx)
 
         self.__addExpr("local " + self.locals[indx] + " = " + expr)
@@ -408,5 +427,8 @@ class LuaDecomp:
             for i in range(numElems):
                 self.__addExpr("%s[%d] = %s" % (ident, (startAt + i + 1), self.__getReg(instr.A + i + 1)))
                 self.__endStatement()
+        elif instr.opcode == Opcodes.CLOSURE:
+            proto = LuaDecomp(self.chunk.protos[instr.B], headChunk=False, scopeOffset=len(self.scope))
+            self.__setReg(instr.A, proto.getPseudoCode())
         else:
             raise Exception("unsupported instruction: %s" % instr.toString())

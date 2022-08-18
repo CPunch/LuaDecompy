@@ -12,70 +12,95 @@ Lua has a relatively small instruction set (only 38 different opcodes!). This ma
 
 ```sh
 > cat example.lua && luac5.1 -o example.luac example.lua
-local tbl = {"He", "llo", " ", "Wo", "rld", "!"}
-local str = ""
+local printMsg = function(append)
+    local tbl = {"He", "llo", " ", "Wo"}
+    local str = ""
 
-for i = 1, #tbl do
-    str = str .. tbl[i]
+    for i = 1, #tbl do
+        str = str .. tbl[i]
+    end
+
+    print(str .. append)
 end
 
-print(str)
+printMsg("rld!")
 > python main.py example.luac
 example.luac
 
 ==== [[example.lua's constants]] ====
 
+0: [STRING] rld!
+
+==== [[example.lua's locals]] ====
+
+R[0]: printMsg
+
+==== [[example.lua's dissassembly]] ====
+
+[  0]    CLOSURE :   R[0]      0               ; 
+[  1]       MOVE :      1      0      0        ; move R[0] into R[1]
+[  2]      LOADK :   R[2]   K[0]               ; load "rld!" into R[2]
+[  3]       CALL :      1      2      1        ; 
+[  4]     RETURN :      0      1      0        ; 
+
+==== [[example.lua's protos]] ====
+
+
+==== [['s constants]] ====
+
 0: [STRING] He
 1: [STRING] llo
 2: [STRING]  
 3: [STRING] Wo
-4: [STRING] rld
-5: [STRING] !
-6: [STRING] 
-7: [NUMBER] 1.0
-8: [STRING] print
+4: [STRING] 
+5: [NUMBER] 1.0
+6: [STRING] print
 
-==== [[example.lua's locals]] ====
+==== [['s locals]] ====
 
-R[0]: tbl
-R[1]: str
-R[2]: (for index)
-R[3]: (for limit)
-R[4]: (for step)
-R[5]: i
+R[0]: append
+R[1]: tbl
+R[2]: str
+R[3]: (for index)
+R[4]: (for limit)
+R[5]: (for step)
+R[6]: i
 
-==== [[example.lua's dissassembly]] ====
+==== [['s dissassembly]] ====
 
-[  0]   NEWTABLE :      0      6      0        ; 
-[  1]      LOADK :   R[1]   K[0]               ; load "He" into R[1]
-[  2]      LOADK :   R[2]   K[1]               ; load "llo" into R[2]
-[  3]      LOADK :   R[3]   K[2]               ; load " " into R[3]
-[  4]      LOADK :   R[4]   K[3]               ; load "Wo" into R[4]
-[  5]      LOADK :   R[5]   K[4]               ; load "rld" into R[5]
-[  6]      LOADK :   R[6]   K[5]               ; load "!" into R[6]
-[  7]    SETLIST :      0      6      1        ; 
-[  8]      LOADK :   R[1]   K[6]               ; load "" into R[1]
-[  9]      LOADK :   R[2]   K[7]               ; load 1 into R[2]
-[ 10]        LEN :      3      0      0        ; 
-[ 11]      LOADK :   R[4]   K[7]               ; load 1 into R[4]
-[ 12]    FORPREP :   R[2]      3               ; 
-[ 13]       MOVE :      6      1      0        ; move R[1] into R[6]
-[ 14]   GETTABLE :   R[7]      0   R[5]        ; 
-[ 15]     CONCAT :      1      6      7        ; concat 2 values from R[6] to R[7], store into R[1]
-[ 16]    FORLOOP :   R[2]     -4               ; 
-[ 17]  GETGLOBAL :   R[2]   K[8]               ; move _G["print"] into R[2]
-[ 18]       MOVE :      3      1      0        ; move R[1] into R[3]
-[ 19]       CALL :      2      2      1        ; 
+[  0]   NEWTABLE :      1      4      0        ; 
+[  1]      LOADK :   R[2]   K[0]               ; load "He" into R[2]
+[  2]      LOADK :   R[3]   K[1]               ; load "llo" into R[3]
+[  3]      LOADK :   R[4]   K[2]               ; load " " into R[4]
+[  4]      LOADK :   R[5]   K[3]               ; load "Wo" into R[5]
+[  5]    SETLIST :      1      4      1        ; 
+[  6]      LOADK :   R[2]   K[4]               ; load "" into R[2]
+[  7]      LOADK :   R[3]   K[5]               ; load 1 into R[3]
+[  8]        LEN :      4      1      0        ; 
+[  9]      LOADK :   R[5]   K[5]               ; load 1 into R[5]
+[ 10]    FORPREP :   R[3]      3               ; 
+[ 11]       MOVE :      7      2      0        ; move R[2] into R[7]
+[ 12]   GETTABLE :   R[8]      1   R[6]        ; 
+[ 13]     CONCAT :      2      7      8        ; concat 2 values from R[7] to R[8], store into R[2]
+[ 14]    FORLOOP :   R[3]     -4               ; 
+[ 15]  GETGLOBAL :   R[3]   K[6]               ; move _G["print"] into R[3]
+[ 16]       MOVE :      4      2      0        ; move R[2] into R[4]
+[ 17]       MOVE :      5      0      0        ; move R[0] into R[5]
+[ 18]     CONCAT :      4      4      5        ; concat 2 values from R[4] to R[5], store into R[4]
+[ 19]       CALL :      3      2      1        ; 
 [ 20]     RETURN :      0      1      0        ; 
 
 ==== [[example.lua's pseudo-code]] ====
 
-local tbl = {"He", "llo", " ", "Wo", "rld", "!", }
-local str = ""
-for i = 1, #tbl, 1 do
-    str = str .. tbl[i]
+local printMsg = function(append)
+    local tbl = {"He", "llo", " ", "Wo", }
+    local str = ""
+    for i = 1, #tbl, 1 do
+        str = str .. tbl[i]
+    end
+    print(str .. append)
 end
-print(str)
 
+printMsg("rld!")
 
 ```
