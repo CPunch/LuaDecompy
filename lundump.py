@@ -70,6 +70,8 @@ _RKBCInstr = [Opcodes.SETTABLE, Opcodes.ADD, Opcodes.SUB, Opcodes.MUL, Opcodes.D
 _RKCInstr = [Opcodes.GETTABLE, Opcodes.SELF]
 _KBx = [Opcodes.LOADK, Opcodes.GETGLOBAL, Opcodes.SETGLOBAL]
 
+_LUAMAGIC = b'\x1bLua'
+
 # is an 'RK' value a K? (result is true for K, false for R)
 def whichRK(rk: int):
     return (rk & (1 << 8)) > 0
@@ -313,29 +315,21 @@ class LuaUndump:
     def get_byte(self) -> int:
         return self.loadBlock(1)[0]
 
-    def get_int32(self) -> int:
-        if (self.big_endian):
-            return int.from_bytes(self.loadBlock(4), byteorder='big', signed=False)
-        else:
-            return int.from_bytes(self.loadBlock(4), byteorder='little', signed=False)
+    def get_uint32(self) -> int:
+        order = 'big' if self.big_endian else 'little'
+        return int.from_bytes(self.loadBlock(4), byteorder=order, signed=False)
 
-    def get_int(self) -> int:
-        if (self.big_endian):
-            return int.from_bytes(self.loadBlock(self.int_size), byteorder='big', signed=False)
-        else:
-            return int.from_bytes(self.loadBlock(self.int_size), byteorder='little', signed=False)
+    def get_uint(self) -> int:
+        order = 'big' if self.big_endian else 'little'
+        return int.from_bytes(self.loadBlock(self.int_size), byteorder=order, signed=False)
 
     def get_size_t(self) -> int:
-        if (self.big_endian):
-            return int.from_bytes(self.loadBlock(self.size_t), byteorder='big', signed=False)
-        else:
-            return int.from_bytes(self.loadBlock(self.size_t), byteorder='little', signed=False)
+        order = 'big' if self.big_endian else 'little'
+        return int.from_bytes(self.loadBlock(self.size_t), byteorder=order, signed=False)
 
     def get_double(self) -> int:
-        if self.big_endian:
-            return struct.unpack('>d', self.loadBlock(8))[0]
-        else:
-            return struct.unpack('<d', self.loadBlock(8))[0]
+        order = '>d' if self.big_endian else '<d'
+        return struct.unpack(order, self.loadBlock(8))[0]
 
     def get_string(self, size) -> str:
         if (size == None):
@@ -349,8 +343,8 @@ class LuaUndump:
         chunk = Chunk()
 
         chunk.name = self.get_string(None)
-        chunk.frst_line = self.get_int()
-        chunk.last_line = self.get_int()
+        chunk.frst_line = self.get_uint()
+        chunk.last_line = self.get_uint()
 
         chunk.numUpvals = self.get_byte()
         chunk.numParams = self.get_byte()
@@ -361,12 +355,12 @@ class LuaUndump:
             chunk.name = chunk.name[1:-1]
 
         # parse instructions
-        num = self.get_int()
+        num = self.get_uint()
         for i in range(num):
-            chunk.appendInstruction(_decode_instr(self.get_int32()))
+            chunk.appendInstruction(_decode_instr(self.get_uint32()))
 
         # get constants
-        num = self.get_int()
+        num = self.get_uint()
         for i in range(num):
             constant: Constant = None
             type = self.get_byte()
@@ -385,7 +379,7 @@ class LuaUndump:
             chunk.appendConstant(constant)
 
         # parse protos
-        num = self.get_int()
+        num = self.get_uint()
         for i in range(num):
             chunk.appendProto(self.decode_chunk())
 
@@ -393,20 +387,20 @@ class LuaUndump:
         # eh, for now just consume the bytes.
 
         # line numbers
-        num = self.get_int()
+        num = self.get_uint()
         for i in range(num):
-            self.get_int()
+            self.get_uint()
 
         # locals
-        num = self.get_int()
+        num = self.get_uint()
         for i in range(num):
             name = self.get_string(None)[:-1] # local name ([:-1] to remove the NULL terminator)
-            start = self.get_int() # local start PC
-            end = self.get_int() # local end PC
+            start = self.get_uint() # local start PC
+            end = self.get_uint() # local end PC
             chunk.appendLocal(Local(name, start, end))
 
         # upvalues
-        num = self.get_int()
+        num = self.get_uint()
         for i in range(num):
             self.get_string(None) # upvalue name
 
@@ -414,18 +408,18 @@ class LuaUndump:
 
     def decode_rawbytecode(self, rawbytecode):
         # bytecode sanity checks
-        if not rawbytecode[0:4] == b'\x1bLua':
+        if not rawbytecode[0:4] == _LUAMAGIC:
             raise Exception("Lua Bytecode expected!")
 
         bytecode = array.array('b', rawbytecode)
         return self.decode_bytecode(bytecode)
 
     def decode_bytecode(self, bytecode):
-        self.bytecode   = bytecode
+        self.bytecode = bytecode
 
         # aligns index, skips header
         self.index = 4
-        
+
         self.vm_version = self.get_byte()
         self.bytecode_format = self.get_byte()
         self.big_endian = (self.get_byte() == 0)
