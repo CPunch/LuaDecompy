@@ -307,11 +307,7 @@ class LuaUndump:
         self.rootChunk: Chunk = None
         self.index = 0
 
-    @staticmethod
-    def dis_chunk(chunk: Chunk):
-        chunk.print()
-    
-    def loadBlock(self, sz) -> bytearray:
+    def _loadBlock(self, sz) -> bytearray:
         if self.index + sz > len(self.bytecode):
             raise Exception("Malformed bytecode!")
 
@@ -319,71 +315,71 @@ class LuaUndump:
         self.index = self.index + sz
         return temp
 
-    def get_byte(self) -> int:
-        return self.loadBlock(1)[0]
+    def _get_byte(self) -> int:
+        return self._loadBlock(1)[0]
 
-    def get_uint32(self) -> int:
+    def _get_uint32(self) -> int:
         order = 'big' if self.big_endian else 'little'
-        return int.from_bytes(self.loadBlock(4), byteorder=order, signed=False)
+        return int.from_bytes(self._loadBlock(4), byteorder=order, signed=False)
 
-    def get_uint(self) -> int:
+    def _get_uint(self) -> int:
         order = 'big' if self.big_endian else 'little'
-        return int.from_bytes(self.loadBlock(self.int_size), byteorder=order, signed=False)
+        return int.from_bytes(self._loadBlock(self.int_size), byteorder=order, signed=False)
 
-    def get_size_t(self) -> int:
+    def _get_size_t(self) -> int:
         order = 'big' if self.big_endian else 'little'
-        return int.from_bytes(self.loadBlock(self.size_t), byteorder=order, signed=False)
+        return int.from_bytes(self._loadBlock(self.size_t), byteorder=order, signed=False)
 
-    def get_double(self) -> int:
+    def _get_double(self) -> int:
         order = '>d' if self.big_endian else '<d'
-        return struct.unpack(order, self.loadBlock(self.l_number_size))[0]
+        return struct.unpack(order, self._loadBlock(self.l_number_size))[0]
 
-    def get_string(self) -> str:
-        size = self.get_size_t()
+    def _get_string(self) -> str:
+        size = self._get_size_t()
         if (size == 0):
             return ""
 
         # [:-1] to remove the NULL terminator
-        return ("".join(chr(x) for x in self.loadBlock(size)))[:-1]
+        return ("".join(chr(x) for x in self._loadBlock(size)))[:-1]
 
     def decode_chunk(self) -> Chunk:
         chunk = Chunk()
 
         # chunk meta info
-        chunk.name = self.get_string()
-        chunk.frst_line = self.get_uint()
-        chunk.last_line = self.get_uint()
-        chunk.numUpvals = self.get_byte()
-        chunk.numParams = self.get_byte()
-        chunk.isVarg = (self.get_byte() != 0)
-        chunk.maxStack = self.get_byte()
+        chunk.name = self._get_string()
+        chunk.frst_line = self._get_uint()
+        chunk.last_line = self._get_uint()
+        chunk.numUpvals = self._get_byte()
+        chunk.numParams = self._get_byte()
+        chunk.isVarg = (self._get_byte() != 0)
+        chunk.maxStack = self._get_byte()
 
         # parse instructions
-        num = self.get_uint()
+        num = self._get_uint()
         for i in range(num):
-            chunk.appendInstruction(_decode_instr(self.get_uint32()))
+            chunk.appendInstruction(_decode_instr(self._get_uint32()))
 
         # get constants
-        num = self.get_uint()
+        num = self._get_uint()
         for i in range(num):
             constant: Constant = None
-            type = self.get_byte()
+            type = self._get_byte()
 
             if type == 0: # nil
                 constant = Constant(ConstType.NIL, None)
             elif type == 1: # bool
-                constant = Constant(ConstType.BOOL, (self.get_byte() != 0))
+                constant = Constant(ConstType.BOOL, (self._get_byte() != 0))
             elif type == 3: # number
-                constant = Constant(ConstType.NUMBER, self.get_double())
+                constant = Constant(ConstType.NUMBER, self._get_double())
             elif type == 4: # string
-                constant = Constant(ConstType.STRING, self.get_string())
+                constant = Constant(ConstType.STRING, self._get_string())
             else:
                 raise Exception("Unknown Datatype! [%d]" % type)
 
             chunk.appendConstant(constant)
 
         # parse protos
-        num = self.get_uint()
+        num = self._get_uint()
         for i in range(num):
             chunk.appendProto(self.decode_chunk())
 
@@ -391,22 +387,22 @@ class LuaUndump:
         # eh, for now just consume the bytes.
 
         # line numbers
-        num = self.get_uint()
+        num = self._get_uint()
         for i in range(num):
-            self.get_uint()
+            self._get_uint()
 
         # locals
-        num = self.get_uint()
+        num = self._get_uint()
         for i in range(num):
-            name = self.get_string() # local name
-            start = self.get_uint() # local start PC
-            end = self.get_uint() # local end PC
+            name = self._get_string() # local name
+            start = self._get_uint() # local start PC
+            end = self._get_uint() # local end PC
             chunk.appendLocal(Local(name, start, end))
 
         # upvalues
-        num = self.get_uint()
+        num = self._get_uint()
         for i in range(num):
-            chunk.appendUpval(self.get_string()) # upvalue name
+            chunk.appendUpval(self._get_string()) # upvalue name
 
         return chunk
 
@@ -424,14 +420,14 @@ class LuaUndump:
         # aligns index, skips header
         self.index = 4
 
-        self.vm_version = self.get_byte()
-        self.bytecode_format = self.get_byte()
-        self.big_endian = (self.get_byte() == 0)
-        self.int_size   = self.get_byte()
-        self.size_t     = self.get_byte()
-        self.instr_size = self.get_byte() # gets size of instructions
-        self.l_number_size = self.get_byte() # size of lua_Number
-        self.integral_flag = self.get_byte() # is lua_Number defined as an int? false = float/double, true = int/long/short/etc.
+        self.vm_version = self._get_byte()
+        self.bytecode_format = self._get_byte()
+        self.big_endian = (self._get_byte() == 0)
+        self.int_size   = self._get_byte()
+        self.size_t     = self._get_byte()
+        self.instr_size = self._get_byte() # gets size of instructions
+        self.l_number_size = self._get_byte() # size of lua_Number
+        self.integral_flag = self._get_byte() # is lua_Number defined as an int? false = float/double, true = int/long/short/etc.
 
         self.rootChunk = self.decode_chunk()
         return self.rootChunk
@@ -442,7 +438,7 @@ class LuaUndump:
             return self.decode_rawbytecode(bytecode)
 
     def print_dissassembly(self):
-        LuaUndump.dis_chunk(self.rootChunk)
+        self.rootChunk.print()
 
 class LuaDump:
     def __init__(self, rootChunk: Chunk):
