@@ -1,7 +1,7 @@
 '''
     l(un)dump.py
 
-    A Lua5.1 cross-platform bytecode deserializer. This module pulls int and size_t sizes from the
+    A Lua5.1 cross-platform bytecode deserializer && serializer. This module pulls int and size_t sizes from the
     chunk header, meaning it should be able to deserialize lua bytecode dumps from most platforms,
     regardless of the host machine.
 
@@ -9,11 +9,9 @@
     as well as read the lundump.c source file from the Lua5.1 source.
 '''
 
-from multiprocessing.spawn import get_executable
 import struct
 import array
 from enum import IntEnum, Enum, auto
-from typing_extensions import Self
 
 class InstructionType(Enum):
     ABC = auto(),
