@@ -231,7 +231,8 @@ class LuaDecomp:
     def __emitOperand(self, a: int, b: str, c: str, op: str) -> None:
         self.__setReg(a, "(" + b + op + c + ")")
 
-    def __compJmp(self, op: str):
+    # handles conditional jumps
+    def __condJmp(self, op: str, rkBC: bool = True):
         instr = self.__getCurrInstr()
         jmpType = "if"
         scopeStart = "then"
@@ -254,7 +255,13 @@ class LuaDecomp:
             self.__addExpr("%s not " % jmpType)
         else:
             self.__addExpr("%s " % jmpType)
-        self.__addExpr(self.__readRK(instr.B) + op + self.__readRK(instr.C) + " ")
+
+        # write actual comparison
+        if rkBC:
+            self.__addExpr(self.__readRK(instr.B) + op + self.__readRK(instr.C) + " ")
+        else: # just testing rkB
+            self.__addExpr(op + self.__readRK(instr.B))
+
         self.pc += 1 # skip next instr
         if scopeStart:
             self.__startScope("%s " % scopeStart, self.pc - 1, jmp)
@@ -368,11 +375,16 @@ class LuaDecomp:
         elif instr.opcode == Opcodes.JMP:
             pass
         elif instr.opcode == Opcodes.EQ:
-            self.__compJmp(" == ")
+            self.__condJmp(" == ")
         elif instr.opcode == Opcodes.LT:
-            self.__compJmp(" < ")
+            self.__condJmp(" < ")
         elif instr.opcode == Opcodes.LE:
-            self.__compJmp(" <= ")
+            self.__condJmp(" <= ")
+        elif instr.opcode == Opcodes.TEST:
+            if instr.C == 0:
+                self.__condJmp("", False)
+            else:
+                self.__condJmp("not ", False)
         elif instr.opcode == Opcodes.CALL:
             preStr = ""
             callStr = ""
