@@ -476,7 +476,7 @@ class LuaDump:
     def _set_double(self, f: float):
         order = '>d' if self.big_endian else '<d'
         self._writeBlock(struct.pack(order, f))
-    
+
     def _set_string(self, string: str):
         self._set_size_t(len(string)+1)
         self._writeBlock(string.encode('utf-8'))

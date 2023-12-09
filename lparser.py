@@ -322,125 +322,125 @@ class LuaDecomp:
     def parseInstr(self):
         instr = self.__getCurrInstr()
 
-        # python, add switch statements *please*
-        if instr.opcode == Opcodes.MOVE: # move is a fake ABC instr, C is ignored
-            # move registers
-            self.__setReg(instr.A, self.__getReg(instr.B))
-        elif instr.opcode == Opcodes.LOADK:
-            self.__setReg(instr.A, self.chunk.getConstant(instr.B).toCode())
-        elif instr.opcode == Opcodes.LOADBOOL:
-            if instr.B == 0:
-                self.__setReg(instr.A, "false")
-            else:
-                self.__setReg(instr.A, "true")
-        elif instr.opcode == Opcodes.GETGLOBAL:
-            self.__setReg(instr.A, self.chunk.getConstant(instr.B).data)
-        elif instr.opcode == Opcodes.GETTABLE:
-            self.__setReg(instr.A, self.__getReg(instr.B) + "[" + self.__readRK(instr.C) + "]")
-        elif instr.opcode == Opcodes.SETGLOBAL:
-            self.__addExpr(self.chunk.getConstant(instr.B).data + " = " + self.__getReg(instr.A))
-            self.__endStatement()
-        elif instr.opcode == Opcodes.SETTABLE:
-            self.__addExpr(self.__getReg(instr.A) + "[" + self.__readRK(instr.B) + "] = " + self.__readRK(instr.C))
-            self.__endStatement()
-        elif instr.opcode == Opcodes.NEWTABLE:
-            self.__parseNewTable(instr.A)
-        elif instr.opcode == Opcodes.ADD:
-            self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " + ")
-        elif instr.opcode == Opcodes.SUB:
-            self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " - ")
-        elif instr.opcode == Opcodes.MUL:
-            self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " * ")
-        elif instr.opcode == Opcodes.DIV:
-            self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " / ")
-        elif instr.opcode == Opcodes.MOD:
-            self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " % ")
-        elif instr.opcode == Opcodes.POW:
-            self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " ^ ")
-        elif instr.opcode == Opcodes.UNM:
-            self.__setReg(instr.A, "-" + self.__getReg(instr.B))
-        elif instr.opcode == Opcodes.NOT:
-            self.__setReg(instr.A, "not " + self.__getReg(instr.B))
-        elif instr.opcode == Opcodes.LEN:
-            self.__setReg(instr.A, "#" + self.__getReg(instr.B))
-        elif instr.opcode == Opcodes.CONCAT:
-            count = instr.C-instr.B+1
-            concatStr = ""
-
-            # concat all items on stack from RC to RB
-            for i in range(count):
-                concatStr += self.__getReg(instr.B + i) + (" .. " if not i == count - 1 else "")
-
-            self.__setReg(instr.A, concatStr)
-        elif instr.opcode == Opcodes.JMP:
-            pass
-        elif instr.opcode == Opcodes.EQ:
-            self.__condJmp(" == ")
-        elif instr.opcode == Opcodes.LT:
-            self.__condJmp(" < ")
-        elif instr.opcode == Opcodes.LE:
-            self.__condJmp(" <= ")
-        elif instr.opcode == Opcodes.TEST:
-            if instr.C == 0:
-                self.__condJmp("", False)
-            else:
-                self.__condJmp("not ", False)
-        elif instr.opcode == Opcodes.CALL:
-            preStr = ""
-            callStr = ""
-            ident = ""
-
-            # parse arguments
-            callStr += self.__getReg(instr.A) + "("
-            for i in range(instr.A + 1, instr.A + instr.B):
-                callStr += self.__getReg(i) + (", " if not i + 1 == instr.A + instr.B else "")
-            callStr += ")"
-
-            # parse return values
-            if instr.C > 1:
-                preStr = "local "
-                for indx  in range(instr.A, instr.A + instr.C - 1):
-                    if indx in self.locals:
-                        ident = self.locals[indx]
-                    else:
-                        ident = self.__makeLocalIdentifier(indx)
-                    preStr += ident
-
-                    # normally setReg() does this
-                    self.top[indx] = ident
-
-                    # just so we don't have a trailing ', '
-                    preStr += ", " if not indx == instr.A + instr.C - 2 else ""
-                preStr += " = "
-
-            self.__addExpr(preStr + callStr)
-            self.__endStatement()
-        elif instr.opcode == Opcodes.RETURN:
-            self.__endStatement()
-            pass # no-op for now
-        elif instr.opcode == Opcodes.FORLOOP:
-            pass # no-op for now
-        elif instr.opcode == Opcodes.FORPREP:
-            self.__addExpr("for %s = %s, %s, %s " % (self.__getLocal(instr.A+3), self.__getReg(instr.A), self.__getReg(instr.A + 1), self.__getReg(instr.A + 2)))
-            self.__startScope("do", self.pc, instr.B)
-        elif instr.opcode == Opcodes.SETLIST:
-            # LFIELDS_PER_FLUSH (50) is the number of elements that *should* have been set in the list in the *last* SETLIST
-            # eg.
-            # [ 49]      LOADK :  R[49]   K[1]               ; load 0.0 into R[49]
-            # [ 50]      LOADK :  R[50]   K[1]               ; load 0.0 into R[50]
-            # [ 51]    SETLIST :      0     50      1        ; sets list[1..50]
-            # [ 52]      LOADK :   R[1]   K[1]               ; load 0.0 into R[1]
-            # [ 53]    SETLIST :      0      1      2        ; sets list[51..51]
-            numElems = instr.B
-            startAt = ((instr.C - 1) * 50)
-            ident = self.__getLocal(instr.A)
-
-            # set each index (TODO: make tables less verbose)
-            for i in range(numElems):
-                self.__addExpr("%s[%d] = %s" % (ident, (startAt + i + 1), self.__getReg(instr.A + i + 1)))
+        match instr.opcode:
+            case Opcodes.MOVE: # move is a fake ABC instr, C is ignored
+                # move registers
+                self.__setReg(instr.A, self.__getReg(instr.B))
+            case Opcodes.LOADK:
+                self.__setReg(instr.A, self.chunk.getConstant(instr.B).toCode())
+            case Opcodes.LOADBOOL:
+                if instr.B == 0:
+                    self.__setReg(instr.A, "false")
+                else:
+                    self.__setReg(instr.A, "true")
+            case Opcodes.GETGLOBAL:
+                self.__setReg(instr.A, self.chunk.getConstant(instr.B).data)
+            case Opcodes.GETTABLE:
+                self.__setReg(instr.A, self.__getReg(instr.B) + "[" + self.__readRK(instr.C) + "]")
+            case Opcodes.SETGLOBAL:
+                self.__addExpr(self.chunk.getConstant(instr.B).data + " = " + self.__getReg(instr.A))
                 self.__endStatement()
-        elif instr.opcode == Opcodes.CLOSURE:
-            proto = LuaDecomp(self.chunk.protos[instr.B], headChunk=False, scopeOffset=len(self.scope))
-            self.__setReg(instr.A, proto.getPseudoCode())
-        else:
-            raise Exception("unsupported instruction: %s" % instr.toString())
+            case Opcodes.SETTABLE:
+                self.__addExpr(self.__getReg(instr.A) + "[" + self.__readRK(instr.B) + "] = " + self.__readRK(instr.C))
+                self.__endStatement()
+            case Opcodes.NEWTABLE:
+                self.__parseNewTable(instr.A)
+            case Opcodes.ADD:
+                self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " + ")
+            case Opcodes.SUB:
+                self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " - ")
+            case Opcodes.MUL:
+                self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " * ")
+            case Opcodes.DIV:
+                self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " / ")
+            case Opcodes.MOD:
+                self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " % ")
+            case Opcodes.POW:
+                self.__emitOperand(instr.A, self.__readRK(instr.B), self.__readRK(instr.C), " ^ ")
+            case Opcodes.UNM:
+                self.__setReg(instr.A, "-" + self.__getReg(instr.B))
+            case Opcodes.NOT:
+                self.__setReg(instr.A, "not " + self.__getReg(instr.B))
+            case Opcodes.LEN:
+                self.__setReg(instr.A, "#" + self.__getReg(instr.B))
+            case Opcodes.CONCAT:
+                count = instr.C-instr.B+1
+                concatStr = ""
+
+                # concat all items on stack from RC to RB
+                for i in range(count):
+                    concatStr += self.__getReg(instr.B + i) + (" .. " if not i == count - 1 else "")
+
+                self.__setReg(instr.A, concatStr)
+            case Opcodes.JMP:
+                pass
+            case Opcodes.EQ:
+                self.__condJmp(" == ")
+            case Opcodes.LT:
+                self.__condJmp(" < ")
+            case Opcodes.LE:
+                self.__condJmp(" <= ")
+            case Opcodes.TEST:
+                if instr.C == 0:
+                    self.__condJmp("", False)
+                else:
+                    self.__condJmp("not ", False)
+            case Opcodes.CALL:
+                preStr = ""
+                callStr = ""
+                ident = ""
+
+                # parse arguments
+                callStr += self.__getReg(instr.A) + "("
+                for i in range(instr.A + 1, instr.A + instr.B):
+                    callStr += self.__getReg(i) + (", " if not i + 1 == instr.A + instr.B else "")
+                callStr += ")"
+
+                # parse return values
+                if instr.C > 1:
+                    preStr = "local "
+                    for indx  in range(instr.A, instr.A + instr.C - 1):
+                        if indx in self.locals:
+                            ident = self.locals[indx]
+                        else:
+                            ident = self.__makeLocalIdentifier(indx)
+                        preStr += ident
+
+                        # normally setReg() does this
+                        self.top[indx] = ident
+
+                        # just so we don't have a trailing ', '
+                        preStr += ", " if not indx == instr.A + instr.C - 2 else ""
+                    preStr += " = "
+
+                self.__addExpr(preStr + callStr)
+                self.__endStatement()
+            case Opcodes.RETURN:
+                self.__endStatement()
+                pass # no-op for now
+            case Opcodes.FORLOOP:
+                pass # no-op for now
+            case Opcodes.FORPREP:
+                self.__addExpr("for %s = %s, %s, %s " % (self.__getLocal(instr.A+3), self.__getReg(instr.A), self.__getReg(instr.A + 1), self.__getReg(instr.A + 2)))
+                self.__startScope("do", self.pc, instr.B)
+            case Opcodes.SETLIST:
+                # LFIELDS_PER_FLUSH (50) is the number of elements that *should* have been set in the list in the *last* SETLIST
+                # eg.
+                # [ 49]      LOADK :  R[49]   K[1]               ; load 0.0 into R[49]
+                # [ 50]      LOADK :  R[50]   K[1]               ; load 0.0 into R[50]
+                # [ 51]    SETLIST :      0     50      1        ; sets list[1..50]
+                # [ 52]      LOADK :   R[1]   K[1]               ; load 0.0 into R[1]
+                # [ 53]    SETLIST :      0      1      2        ; sets list[51..51]
+                numElems = instr.B
+                startAt = ((instr.C - 1) * 50)
+                ident = self.__getLocal(instr.A)
+
+                # set each index (TODO: make tables less verbose)
+                for i in range(numElems):
+                    self.__addExpr("%s[%d] = %s" % (ident, (startAt + i + 1), self.__getReg(instr.A + i + 1)))
+                    self.__endStatement()
+            case Opcodes.CLOSURE:
+                proto = LuaDecomp(self.chunk.protos[instr.B], headChunk=False, scopeOffset=len(self.scope))
+                self.__setReg(instr.A, proto.getPseudoCode())
+            case _:
+                raise Exception("unsupported instruction: %s" % instr.toString())
