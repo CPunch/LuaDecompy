@@ -127,22 +127,21 @@ class Instruction:
 
     def getAnnotation(self, chunk):
         if self.opcode == Opcodes.MOVE:
-            return "move R[%d] into R[%d]" % (self.B, self.A)
+            return "R[%d] := R[%d]" % (self.A, self.B)
         elif self.opcode == Opcodes.LOADK:
-            return "load %s into R[%d]" % (chunk.getConstant(self.B).toCode(), self.A)
+            return "R[%d] := K[%d] (%s)" % (self.A, self.B, chunk.getConstant(self.B).toCode())
         elif self.opcode == Opcodes.GETGLOBAL:
-            return 'move _G[%s] into R[%d]' % (chunk.getConstant(self.B).toCode(), self.A)
+            return 'R[%d] := _G[%s]' % (self.A, chunk.getConstant(self.B).toCode())
         elif self.opcode == Opcodes.ADD:
-            return 'add %s to %s, place into R[%d]' % (self.__formatRK(self.C), self.__formatRK(self.B), self.A)
+            return 'R[%d] := %s + %s' % (self.A, self.__formatRK(self.B), self.__formatRK(self.C))
         elif self.opcode == Opcodes.SUB:
-            return 'sub %s from %s, place into R[%d]' % (self.__formatRK(self.C), self.__formatRK(self.B), self.A)
+            return 'R[%d] := %s - %s' % (self.A, self.__formatRK(self.B), self.__formatRK(self.C))
         elif self.opcode == Opcodes.MUL:
-            return 'mul %s to %s, place into R[%d]' % (self.__formatRK(self.C), self.__formatRK(self.B), self.A)
+            return 'R[%d] := %s * %s' % (self.A, self.__formatRK(self.B), self.__formatRK(self.C))
         elif self.opcode == Opcodes.DIV:
-            return 'div %s from %s, place into R[%d]' % (self.__formatRK(self.C), self.__formatRK(self.B), self.A)
+            return 'R[%d] := %s / %s' % (self.A, self.__formatRK(self.B), self.__formatRK(self.C))
         elif self.opcode == Opcodes.CONCAT:
-            count = self.C - self.B + 1
-            return "concat %d values from R[%d] to R[%d], store into R[%d]" % (count, self.B, self.C, self.A)
+            return "R[%d] := R[%d] .. R[%d]" % (self.A, self.B, self.C)
         else:
             return ""
 
