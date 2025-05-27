@@ -104,3 +104,42 @@ end
 printMsg("rld!")
 
 ```
+
+## Testing
+
+This project uses `pytest` to run a test suite based on the official Lua 5.1 tests.
+The tests work by:
+1. Compiling each Lua test file (`.lua`) from the suite to bytecode using `luac5.1`.
+2. Decompiling the bytecode back into pseudocode using LuaDecompy.
+3. Executing the generated pseudocode with a Lua 5.1 interpreter (`lua5.1`).
+4. The test passes if the Lua interpreter executes the pseudocode successfully (exit code 0), relying on assertions within the original Lua tests to verify correctness.
+
+### Prerequisites
+
+1.  **Install Python development dependencies:**
+    ```bash
+    pip install -r requirements-dev.txt
+    ```
+
+2.  **Install Lua 5.1:**
+    You need the Lua 5.1 interpreter (`lua5.1`) and the Lua 5.1 compiler (`luac5.1`) to be available in your system's PATH. These are often packaged together. Installation methods vary by operating system:
+    *   **Debian/Ubuntu:** `sudo apt-get install lua5.1 liblua5.1-0-dev luarocks` (luarocks might bundle luac or you might need a separate luac package).
+    *   **macOS (Homebrew):** `brew install lua@5.1`
+    *   **Windows:** Download binaries from the Lua Binaries project or compile from source. Ensure `lua5.1.exe` and `luac5.1.exe` are in your PATH.
+
+3.  **Download the Lua 5.1 Test Suite:**
+    The test runner expects the Lua 5.1 test files to be present in the `tests/lua5.1_suite/` directory.
+    - The test files can be downloaded from [https://www.lua.org/tests/lua5.1-tests.tar.gz](https_host/tests/lua5.1-tests.tar.gz).
+    - Download and extract this archive.
+    - Copy all the `.lua` files from the `lua-5.1-tests/` directory (or similar, depending on the archive structure, often it's a flat list of files in the root of the archive, like `all.lua`, `api.lua` etc.) into the `tests/lua5.1_suite/` directory in this project.
+    *(The previous step in the development process already populated this directory if you followed along).*
+
+### Running Tests
+
+Once the prerequisites are met, you can run the tests using `pytest` from the root of the project:
+
+```bash
+pytest
+```
+
+Pytest will discover and run all tests in the `tests/` directory. You should see output indicating the status of each test file from the Lua suite.
